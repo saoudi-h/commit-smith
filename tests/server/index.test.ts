@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CommitSmithServer } from "../../src/index.js";
+import {
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 
 // Mock dependencies
 vi.mock("@modelcontextprotocol/sdk/server/index.js");
@@ -28,16 +32,13 @@ describe("CommitSmithServer", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
     mockServer = {
       setRequestHandler: vi.fn(),
       connect: vi.fn(),
       close: vi.fn(),
       onerror: null,
     };
-
     (Server as any).mockImplementation(() => mockServer);
-
     server = new CommitSmithServer();
   });
 
@@ -52,35 +53,68 @@ describe("CommitSmithServer", () => {
           capabilities: {
             tools: {},
             resources: {},
+            sampling: {},
           },
-        }),
+        })
       );
     });
 
     it("should setup request handlers", () => {
-      expect(mockServer.setRequestHandler).toHaveBeenCalledTimes(4); // ListTools, CallTool, ListResources, ReadResource
+      // Should have handlers for: ListTools, CallTool, ListResources, ReadResource
+      expect(mockServer.setRequestHandler).toHaveBeenCalledTimes(4);
     });
   });
 
   describe("tool handlers", () => {
-    it("should register all expected tools", async () => {
-      // Simply verify that setRequestHandler was called 4 times (one for each handler type)
-      expect(mockServer.setRequestHandler).toHaveBeenCalledTimes(4);
+    it("should register only commit tool", async () => {
+      // Get the ListTools handler
+      const listToolsRegistration =
+        mockServer.setRequestHandler.mock.calls.find(
+          (call) => call[0] === ListToolsRequestSchema
+        );
 
-      // Since we can't easily mock the schemas, we'll just verify the handlers were set up
-      // This is a limitation of the mocking approach, but the functionality is tested in integration tests
-      expect(mockServer.setRequestHandler).toHaveBeenCalled();
+      if (!listToolsRegistration) {
+        throw new Error("ListToolsRequest handler not registered");
+      }
+
+      const listToolsHandler = listToolsRegistration[1];
+      const toolsResponse = await listToolsHandler();
+
+      // Should only have the commit tool
+      expect(toolsResponse.tools).toHaveLength(1);
+      expect(toolsResponse.tools[0].name).toBe("commit");
+      expect(toolsResponse.tools[0].description).toContain(
+        "ANALYZE GIT CHANGES AND GENERATE COMMIT MESSAGE USING AI"
+      );
     });
   });
 
   describe("resource handlers", () => {
     it("should register all expected resources", async () => {
-      // Simply verify that setRequestHandler was called 4 times (one for each handler type)
-      expect(mockServer.setRequestHandler).toHaveBeenCalledTimes(4);
+      // Get the ListResources handler
+      const listResourcesRegistration =
+        mockServer.setRequestHandler.mock.calls.find(
+          (call) => call[0] === ListResourcesRequestSchema
+        );
 
-      // Since we can't easily mock the schemas, we'll just verify the handlers were set up
-      // This is a limitation of the mocking approach, but the functionality is tested in integration tests
-      expect(mockServer.setRequestHandler).toHaveBeenCalled();
+      if (!listResourcesRegistration) {
+        throw new Error("ListResourcesRequest handler not registered");
+      }
+
+      const listResourcesHandler = listResourcesRegistration[1];
+      const resourcesResponse = await listResourcesHandler();
+
+      // Should have all expected resources
+      expect(resourcesResponse.resources).toHaveLength(3);
+      expect(resourcesResponse.resources.map((r) => r.uri)).toContain(
+        "commit://agent-definition"
+      );
+      expect(resourcesResponse.resources.map((r) => r.uri)).toContain(
+        "commit://presets"
+      );
+      expect(resourcesResponse.resources.map((r) => r.uri)).toContain(
+        "commit://ai-guide"
+      );
     });
   });
 
@@ -98,7 +132,6 @@ describe("CommitSmithServer", () => {
   describe("start", () => {
     it("should start server successfully", async () => {
       mockServer.connect.mockResolvedValue(undefined);
-
       const consoleErrorSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
@@ -107,7 +140,7 @@ describe("CommitSmithServer", () => {
 
       expect(mockServer.connect).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "CommitSmith MCP server started successfully",
+        "CommitSmith MCP server started successfully"
       );
 
       consoleErrorSpy.mockRestore();
@@ -115,7 +148,6 @@ describe("CommitSmithServer", () => {
 
     it("should handle start failures", async () => {
       mockServer.connect.mockRejectedValue(new Error("Connection failed"));
-
       const consoleErrorSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
@@ -127,7 +159,7 @@ describe("CommitSmithServer", () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "Failed to start CommitSmith server:",
-        expect.any(Error),
+        expect.any(Error)
       );
       expect(processExitSpy).toHaveBeenCalledWith(1);
 

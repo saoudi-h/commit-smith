@@ -6,8 +6,3 @@ export const CommitSchema = z.object({
   auto_commit: z.boolean().default(true),
   auto_stage: z.boolean().default(true),
 });
-
-export const ValidateAndCommitSchema = z.object({
-  message: z.string().min(1, "Commit message is required"),
-  auto_commit: z.boolean().default(true),
-});
