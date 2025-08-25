@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  commit-smith:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: commit-smith
+    command: ["node", "dist/index.js"]
+    volumes:
+      - .:/app
+      - /app/node_modules
+    working_dir: /app
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Uncomment if you need to expose ports
+    # ports:
+    #   - "3000:3000"
+
+  # Development service with hot reload
+  commit-smith-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: commit-smith-dev
+    command: ["npm", "run", "dev"]
+    volumes:
+      - .:/app
+      - /app/node_modules
+    working_dir: /app
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "9229:9229"  # Debug port
+    profiles:
+      - dev

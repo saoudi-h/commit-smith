@@ -1,0 +1,107 @@
+{
+  "name": "commit-smith",
+  "version": "0.1.0",
+  "description": "MCP server that provides AI tools for generating conventional commit messages from git diffs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "bin": {
+    "commit-smith": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --check src/**/*.ts tests/**/*.ts",
+    "format:fix": "prettier --write src/**/*.ts tests/**/*.ts",
+    "clean": "rm -rf dist coverage",
+    "typecheck": "tsc --noEmit",
+    "docker:build": "docker build -t commit-smith .",
+    "docker:run": "docker run --rm -it commit-smith",
+    "prepublish": "npm run clean && npm run build && npm test",
+    "inspector": "pnpx @modelcontextprotocol/inspector node ./dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "git",
+    "commit",
+    "conventional-commits",
+    "ai",
+    "claude",
+    "automation",
+    "development-tools"
+  ],
+  "author": "CommitSmith Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/commit-smith/commit-smith.git"
+  },
+  "bugs": {
+    "url": "https://github.com/commit-smith/commit-smith/issues"
+  },
+  "homepage": "https://github.com/commit-smith/commit-smith#readme",
+  "dependencies": {
+    "@commitlint/core": "^19.8.1",
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "simple-git": "^3.24.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@types/node": "^20.11.24",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "@vitest/coverage-v8": "^1.2.2",
+    "commitlint": "^19.8.1",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "mcp": {
+    "server": {
+      "command": "node",
+      "args": [
+        "dist/index.js"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "tools": [
+      {
+        "name": "commit",
+        "description": "Generate and prepare commit messages using natural language requests. Handles unstaged files intelligently and can optionally auto-commit."
+      }
+    ],
+    "resources": [
+      {
+        "uri": "commit://agent-definition",
+        "name": "CommitSmith Agent Definition",
+        "description": "The complete prompt defining how the AI should behave as CommitSmith"
+      },
+      {
+        "uri": "commit://presets",
+        "name": "Available Agent Presets",
+        "description": "List of available agent behavior presets"
+      }
+    ]
+  }
+}
