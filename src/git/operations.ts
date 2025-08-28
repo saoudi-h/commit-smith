@@ -67,6 +67,18 @@ export class GitOperations {
   }
 
   /**
+   * Get the list of currently staged files
+   */
+  async getStagedFiles(): Promise<string[]> {
+    try {
+      const status = await this.git.status();
+      return status.staged;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Stage specific files
    */
   async stageFiles(files: string[]): Promise<void> {

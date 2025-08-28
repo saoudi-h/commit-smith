@@ -14,6 +14,7 @@ export class CommitToolHandlers {
     const validatedArgs = CommitSchema.parse(args);
 
     try {
+      let stagedFiles = [];
       const shouldAutoStage = validatedArgs.auto_stage;
       const shouldAutoCommit = validatedArgs.auto_commit;
 
@@ -25,43 +26,35 @@ export class CommitToolHandlers {
 
       // Check for staged changes
       const hasStagedChanges = await this.gitOps.hasStagedChanges();
+      console.log("Has staged changes:", hasStagedChanges);
       
       // Check for unstaged files if auto-staging is enabled
-      const unstagedFiles = shouldAutoStage ? await this.gitOps.getUnstagedFiles() : [];
       
-      if (!hasStagedChanges && unstagedFiles.length === 0) {
-        throw new McpError(ErrorCode.InvalidParams, "No staged or unstaged changes found");
+      if(!hasStagedChanges && !shouldAutoStage) {
+        throw new McpError(ErrorCode.InvalidParams, `No staged changes found. Please stage your changes first with git add or turn
+        on auto staging with auto_stage: true.`);
       }
 
-      // Handle unstaged files
-      let filesToStage = [];
-      if (unstagedFiles.length > 0) {
-        if (shouldAutoStage) {
+      if(!hasStagedChanges && shouldAutoStage) {  
+        const unstagedFiles = shouldAutoStage ? await this.gitOps.getUnstagedFiles() : [];
+        if(unstagedFiles.length === 0) {
+          throw new McpError(ErrorCode.InvalidParams, `No changes found.`)
+        }
+        // Handle unstaged files
+       
+        
           // Auto-stage all unstaged files
           await this.gitOps.stageFiles(unstagedFiles);
-          filesToStage = unstagedFiles;
-        } else {
-          // Return confirmation request for unstaged files
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(
-                  {
-                    success: false,
-                    needs_confirmation: true,
-                    message: `Found ${unstagedFiles.length} unstaged files. Please confirm if you want to stage them:`,
-                    unstaged_files: unstagedFiles,
-                    suggestion: "You can call the commit tool again with auto_stage: true to automatically stage these files.",
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-          };
-        }
+          stagedFiles = unstagedFiles;
+        
+        
+      } else {
+        // Get the list of currently staged files
+        stagedFiles = await this.gitOps.getStagedFiles();
       }
+
+
+
 
       // Get the staged diff for AI to analyze and generate commit message
       const stagedDiff = await this.gitOps.getStagedDiff();
@@ -82,7 +75,7 @@ export class CommitToolHandlers {
                 user_request: validatedArgs.request,
                 selected_preset: selectedPreset,
                 preset_config: presetConfig,
-                files_staged: filesToStage.length,
+                files_staged: stagedFiles.length,
                 auto_commit: shouldAutoCommit,
                 next_step: "Please generate a commit message based on the diff and user request using preset_config. Call validate_and_commit with generated message and auto_commit setting.",
               },

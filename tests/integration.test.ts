@@ -5,6 +5,9 @@ import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 // Mock the base server to capture the request handler
 vi.mock("@modelcontextprotocol/sdk/server/index.js");
+vi.mock("../src/git/operations.js");
+vi.mock("../src/validation/registry.js");
+vi.mock("../src/config/config-manager.js");
 
 describe("Integration Tests for Tool Calls", () => {
   let server: CommitSmithServer;
@@ -26,38 +29,44 @@ describe("Integration Tests for Tool Calls", () => {
       validate: vi.fn().mockResolvedValue({ valid: true, errors: [], warnings: [] }),
       formatErrors: vi.fn().mockReturnValue("")
     };
-    
-    vi.doMock("../src/validation/registry.js", async () => {
-      const module = await import("../src/validation/registry.js");
-      return {
-        ...module,
-        validationAdapterRegistry: {
-          get: vi.fn().mockReturnValue(mockValidationAdapter),
-          register: vi.fn(),
-        },
-      };
-    });
 
     // Mock git operations
-    vi.doMock("../src/git/operations.js", () => ({
-      GitOperations: vi.fn().mockImplementation(() => ({
+    const { GitOperations } = await import("../src/git/operations.js");
+    vi.mocked(GitOperations).mockImplementation(() => ({
+      git: {
         checkIsRepo: vi.fn().mockResolvedValue(true),
-        hasStagedChanges: vi.fn().mockResolvedValue(true),
-        getUnstagedFiles: vi.fn().mockResolvedValue([]),
-        stageFiles: vi.fn().mockResolvedValue(undefined),
-        getStagedDiff: vi.fn().mockResolvedValue({ content: "test diff" }),
-        prepareCommitMessage: vi.fn().mockResolvedValue(undefined),
-        commitWithMessage: vi.fn().mockResolvedValue({ success: true, commitSha: "abc123" }),
-      })),
-    }));
+        diff: vi.fn().mockResolvedValue(""),
+        status: vi.fn().mockResolvedValue({ staged: ["file1.txt", "file2.txt"], not_added: [], modified: [], created: [], deleted: [] }),
+        add: vi.fn().mockResolvedValue(undefined),
+        revparse: vi.fn().mockResolvedValue(".git"),
+        commit: vi.fn().mockResolvedValue({ commit: "abc123" }),
+      },
+      checkIsRepo: vi.fn().mockResolvedValue(true),
+      hasStagedChanges: vi.fn().mockResolvedValue(true),
+      getUnstagedFiles: vi.fn().mockResolvedValue([]),
+      getStagedFiles: vi.fn().mockResolvedValue(["file1.txt", "file2.txt"]),
+      stageFiles: vi.fn().mockResolvedValue(undefined),
+      getStagedDiff: vi.fn().mockResolvedValue({ content: "test diff" }),
+      prepareCommitMessage: vi.fn().mockResolvedValue(undefined),
+      commitWithMessage: vi.fn().mockResolvedValue({ success: true, commitSha: "abc123" }),
+    } as any));
 
     // Mock config manager
-    vi.doMock("../src/config/config-manager.js", () => ({
-      ConfigManager: vi.fn().mockImplementation(() => ({
-        getConfig: vi.fn().mockReturnValue({}),
+    const { ConfigManager } = await import("../src/config/config-manager.js");
+    vi.mocked(ConfigManager).mockImplementation(() => {
+      const config = { agent: { preset: "default" }, behavior: { require_confirmation: true } };
+      return {
+        getConfig: vi.fn().mockReturnValue({ ...config }),
+        updateConfig: vi.fn().mockReturnValue({ ...config }),
+        getDefaultConfig: vi.fn().mockReturnValue({ agent: { preset: "default" }, behavior: { require_confirmation: true } }),
         getAgentPrompt: vi.fn().mockReturnValue({}),
-      })),
-    }));
+      } as any;
+    });
+
+    // Mock validation adapter registry
+    const { validationAdapterRegistry } = await import("../src/validation/registry.js");
+    vi.mocked(validationAdapterRegistry.get).mockReturnValue(mockValidationAdapter);
+    vi.mocked(validationAdapterRegistry.register).mockImplementation(() => {});
 
     // Re-import server after mocks are set up
     const { CommitSmithServer: ServerClass } = await import("../src/index.js");
@@ -135,27 +144,5 @@ describe("Integration Tests for Tool Calls", () => {
     // The response should have validation information
     expect(response).toHaveProperty('success');
     expect(response).toHaveProperty('validation');
-  });
-
-  it("should handle unstaged files confirmation", async () => {
-    // Test the basic unstaged files scenario
-    const request = {
-      params: {
-        name: "commit",
-        arguments: {
-          request: "Generate a commit for my changes",
-          auto_commit: false,
-          auto_stage: false
-        },
-      },
-    };
-
-    // This test will work with the actual implementation
-    // The exact behavior depends on the git state, but we can test the structure
-    const result = await callToolHandler(request);
-    const response = JSON.parse(result.content[0].text);
-
-    expect(response).toHaveProperty('success');
-    expect(response).toHaveProperty('diff');
   });
 });
